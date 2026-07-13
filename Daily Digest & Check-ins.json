@@ -1,0 +1,828 @@
+{
+  "name": "Asadulla - Daily Digest & Check-ins",
+  "nodes": [
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Create an event in Google Calendar only when the user clearly asks to add, schedule, book, save, or create a calendar event and provides enough date/time information. Ask a clarification question if date or time is missing.",
+        "calendar": {
+          "__rl": true,
+          "mode": "list",
+          "value": "asadullaxamidullayev4@gmail.com"
+        },
+        "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Start', `Event start datetime in ISO 8601 with timezone +05:00. Example: 2026-07-03T15:00:00+05:00`, 'string') }}",
+        "end": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('End', `Event end datetime in ISO 8601 with timezone +05:00. If duration is not specified, use one hour after Start. Example: 2026-07-03T16:00:00+05:00`, 'string') }}",
+        "additionalFields": {
+          "description": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Description', `Short event description based on the user's message. Use empty string if not needed.`, 'string') }}",
+          "location": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Location', `Event location if user provided it. Use empty string if not provided.`, 'string') }}",
+          "summary": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Summary', `Short event title`, 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        -3792,
+        3440
+      ],
+      "id": "a8cf2245-bf72-404e-af62-a57e251f7142",
+      "name": "Create Event in Google Calendar2",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "NRybpIKnHwEhH5M8",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "✅ Рабочая цепочка: Telegram Trigger → Prepare Telegram Message → AI Agent + Gemini + Memory + Google Calendar → Prepare Reply → Send Reply.\n\nЧто умеет:\n1) Обычный AI-чат в Telegram.\n2) Память по chat.id.\n3) Создание событий в Google Calendar, если пользователь написал дату и время.\n\nПосле импорта проверь credentials у Telegram, Google Gemini и Google Calendar, затем нажми Active.\nТест: 'Ertaga 15:00 da uchrashuv qo‘sh, nomi: test meeting'."
+      },
+      "id": "53741d9b-a3b4-483c-a071-df627cc28cca",
+      "name": "Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -4304,
+        2800
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.reply }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "b2e37675-8dfb-43ac-b70c-c43d0b13ae8e",
+      "name": "Send Reply2",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -4192,
+        3120
+      ],
+      "webhookId": "bc0af4f5-b8f1-4945-9592-9d179a666942",
+      "settings": {
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "R6Lcd8ikBQclkdWk",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = ($json.output || $json.text || '').toString().trim();\n\nlet reply = output || 'Не смог сформировать ответ. Напиши ещё раз, пожалуйста.';\n\n// Telegram limit is 4096 characters. Keep a safe margin.\nif (reply.length > 3900) {\n  reply = reply.slice(0, 3900) + '\\n\\n…ответ был слишком длинный, поэтому я сократил его.';\n}\n\nreturn [\n  {\n    json: {\n      chatId: $('Prepare Telegram Message2').first().json.chatId,\n      reply\n    }\n  }\n];"
+      },
+      "id": "75003df7-a444-4e8a-b6f2-f6fb7116dae5",
+      "name": "Prepare Reply2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4432,
+        3120
+      ]
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Prepare Telegram Message2').first().json.chatId }}",
+        "contextWindowLength": 10
+      },
+      "id": "a073d01c-a9d2-4eaf-b623-f470b2ae3450",
+      "name": "Window Buffer Memory2",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        -4016,
+        3392
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.userText }}",
+        "options": {
+          "systemMessage": "Ты — дружелюбный AI-ассистент в Telegram. Отвечай на языке пользователя: русский, узбекский или английский. Пиши понятно, кратко и по делу.\n\nУ тебя есть инструмент Google Calendar для создания событий в календаре. Текущая дата: 2026-07-03. Часовой пояс пользователя и календаря: Asia/Tashkent, UTC+05:00.\n\nКогда пользователь просит записать встречу, напомнить о созвоне, добавить событие, забронировать время или создать задачу в календаре: если есть название/смысл события, дата и время — используй Google Calendar tool. Start и End всегда передавай в ISO 8601 с часовым поясом +05:00, например 2026-07-03T15:00:00+05:00. Если длительность не указана, ставь 1 час. Summary делай коротким и понятным. Description заполняй кратко по запросу пользователя. Если даты или времени не хватает, сначала задай один короткий уточняющий вопрос и не создавай событие.\n\nПосле успешного создания события обязательно ответь пользователю обычным сообщением в Telegram: что добавлено, на какую дату и время. Не упоминай n8n, Gemini и внутреннюю техническую цепочку без необходимости."
+        }
+      },
+      "id": "7428f32f-2103-4093-a5cd-766f7dae18d0",
+      "name": "AI Agent2",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -4080,
+        3120
+      ],
+      "settings": {
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 1000
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const msg = $json.message || $json.edited_message || {};\nconst chatId = msg.chat?.id;\n\nif (!chatId) {\n  throw new Error('Telegram chat id not found. Check Telegram Trigger output.');\n}\n\nconst rawText = (msg.text || msg.caption || '').trim();\n\nreturn [\n  {\n    json: {\n      chatId,\n      userId: msg.from?.id || null,\n      username: msg.from?.username || '',\n      firstName: msg.from?.first_name || '',\n      messageId: msg.message_id || null,\n      userText: rawText || 'Пользователь отправил не текстовое сообщение. Вежливо попроси его отправить текст.'\n    }\n  }\n];"
+      },
+      "id": "e72d0b29-e1f8-440e-a264-2760cc100d91",
+      "name": "Prepare Telegram Message2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5024,
+        3120
+      ]
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "28e25aa0-2ca4-4455-a465-3647334b9c11",
+      "name": "Telegram Trigger2",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -5264,
+        3120
+      ],
+      "webhookId": "ec03e953-b01d-4c97-9d63-fa4b04e71624",
+      "credentials": {
+        "telegramApi": {
+          "id": "R6Lcd8ikBQclkdWk",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -4176,
+        3440
+      ],
+      "id": "45a84c7d-d9a7-4de3-93d4-104981a38c24",
+      "name": "Google Gemini Chat Model2",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "aGmKa1MN8UaVewNY",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "eventsData",
+        "options": {}
+      },
+      "id": "2b956547-9217-4c6f-9196-51abcdcd1bd5",
+      "name": "Aggregate Events",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -1984,
+        3200
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "emailsData",
+        "options": {}
+      },
+      "id": "64880bd2-2bdb-4d43-9bd3-ae0c4467973d",
+      "name": "Aggregate Emails",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -1728,
+        3200
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "45a9e7fe-eda0-430d-b9c0-d343c368a74b",
+      "name": "Every Morning 08:",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -2576,
+        3200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.open-meteo.com/v1/forecast",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "latitude",
+              "value": "41.2995"
+            },
+            {
+              "name": "longitude",
+              "value": "69.2401"
+            },
+            {
+              "name": "current",
+              "value": "temperature_2m,weather_code"
+            },
+            {
+              "name": "daily",
+              "value": "sunrise,sunset"
+            },
+            {
+              "name": "timezone",
+              "value": "Asia/Tashkent"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "40d6abfd-dc0d-4341-b3d6-1d56f4a7c1f6",
+      "name": "Get Weather1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2336,
+        3200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "asadullaxamidullayev4@gmail.com",
+          "mode": "list",
+          "cachedResultName": "asadullaxamidullayev4@gmail.com"
+        },
+        "timeMin": "={{ $now.startOf('day').toISO() }}",
+        "timeMax": "={{ $now.endOf('day').toISO() }}",
+        "options": {}
+      },
+      "id": "630de418-b35f-48d7-b8ce-e39d9e0509d6",
+      "name": "Get Today Events1",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        -2096,
+        3200
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "NRybpIKnHwEhH5M8",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": 10,
+        "filters": {
+          "q": "is:unread"
+        }
+      },
+      "id": "8c9ddea2-358d-45cf-b4e3-b80b643689ac",
+      "name": "Get Unread Gmail1",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -1856,
+        3200
+      ],
+      "notesInFlow": true,
+      "webhookId": "ca2f7e35-98fe-4727-af61-69be7c81b154",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "7zu43ZdvfwzKyk3P",
+          "name": "Gmail OAuth2 API"
+        }
+      },
+      "notes": "Gmail credential'ingizni ulang"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "11KcBAvGn_-Tp5bDPzu9WU3tbu4-znRZLQeTUXOYojfg",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "0",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "414f34b3-2123-4f07-b267-766058c13bb9",
+      "name": "Get Projects Sheet1",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -1616,
+        3200
+      ],
+      "notesInFlow": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "u2CygIEy4iFYE0lH",
+          "name": "Google Sheets OAuth2 API"
+        }
+      },
+      "notes": "Google Sheets credential ulang (Sheet ID va gid=0 allaqachon qo'yilgan)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const weather = $('Get Weather1').first().json;\nconst events = ($('Aggregate Events').first().json.eventsData) || [];\nlet gmail = [];\ntry { gmail = ($('Aggregate Emails').first().json.emailsData) || []; } catch (e) { gmail = []; }\nlet sheets = [];\ntry { sheets = $('Get Projects Sheet1').all().map(i => i.json); } catch (e) { sheets = []; }\n\nconst temp = Math.round(weather.current?.temperature_2m ?? 0);\nconst sunrise = (weather.daily?.sunrise?.[0] || '').split('T')[1] || '--:--';\nconst sunset = (weather.daily?.sunset?.[0] || '').split('T')[1] || '--:--';\n\nconst now = new Date();\nconst dateStr = now.toLocaleDateString('uz-UZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Tashkent' });\nconst timeStr = now.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tashkent' });\n\nlet calendarBlock = events.length\n  ? events.map(e => {\n      const start = (e.start?.dateTime || e.start?.date || '').slice(11,16) || 'kun bo\\u2018yi';\n      return `\\ud83d\\udfe2 ${start} \\u2014 ${e.summary || 'Nomsiz tadbir'}${e.location ? `\\n\\ud83d\\udccd ${e.location}` : ''}`;\n    }).join('\\n')\n  : 'Bugun rejalashtirilgan tadbir yo\\u2018q \\u2705';\n\nconst gmailCount = gmail.length;\nconst gmailImportant = gmail.slice(0,3).map(m => {\n  const from = m.payload?.headers?.find(h => h.name === 'From')?.value || '';\n  return from.split('<')[0].trim();\n}).filter(Boolean).join(', ');\n\nlet projectsBlock = sheets.length\n  ? sheets.map(p => {\n      const status = p.Status || '\\u26aa';\n      const prog = p.Progress || '-';\n      const priority = p.Priority ? ` (${p.Priority})` : '';\n      const deadline = p.Deadline && p.Deadline !== '-' ? `\\n   \\ud83d\\udcc6 Muddat: ${p.Deadline}` : '';\n      const nextTask = p['Next Task'] && p['Next Task'] !== '-' ? `\\n   \\u25b6\\ufe0f Keyingi: ${p['Next Task']}` : '';\n      return `${status} ${p.Project}${priority} \\u2014 ${prog}${deadline}${nextTask}`;\n    }).join('\\n')\n  : 'Loyihalar ro\\u2018yxati bo\\u2018sh (Google Sheets\\u2019ni to\\u2018ldiring)';\n\nconst overdueOrHigh = sheets.filter(p => (p.Priority || '').toLowerCase().includes('high')).map(p => p.Project);\n\nconst summaryForAI = `Bugun ${events.length} ta tadbir, ${gmailCount} ta o'qilmagan email. Loyihalar: ${sheets.length ? sheets.map(p => `${p.Project} (${p.Progress}, ${p.Priority || 'priority yo\\u2018q'}, keyingi vazifa: ${p['Next Task'] || 'yo\\u2018q'})`).join('; ') : 'yo\\u2018q'}. Yuqori muhimlikdagi loyihalar: ${overdueOrHigh.length ? overdueOrHigh.join(', ') : 'yo\\u2018q'}.`;\n\nreturn [{\n  json: {\n    dateStr, timeStr, temp, sunrise, sunset,\n    calendarBlock, gmailCount, gmailImportant, projectsBlock,\n    summaryForAI\n  }\n}];"
+      },
+      "id": "6af12524-157f-44a3-a971-72a6f4ecdb32",
+      "name": "Build Digest Base1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1376,
+        3200
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "caa6f0bd-ba86-4614-ad72-d565ddc6a8e1",
+      "name": "Gemini Model (Digest)1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -1136,
+        3424
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "aGmKa1MN8UaVewNY",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.summaryForAI }}",
+        "options": {
+          "systemMessage": "Siz Asadulla uchun shaxsiy yordamchisiz. Sizga bugungi kun haqida qisqacha ma'lumot (tadbirlar soni, o'qilmagan xatlar soni, loyihalar foizi) beriladi. Shu asosda FAQAT quyidagi ikkita bo'limni yozing, boshqa hech narsa qo'shmang:\n\n💡 AI TAVSIYASI\n(1-2 gap, bugungi ish yukiga mos amaliy maslahat)\n\n🔥 MOTIVATSIYA\n\"(qisqa, ilhomlantiruvchi iqtibos yoki o'zingiz to'qigan gap)\"\n\nFaqat shu ikki bo'limni yozing. Sana, ob-havo yoki boshqa narsalarni takrorlamang. O'zbek tilida yozing."
+        }
+      },
+      "id": "40be7826-edea-485f-a1f0-214cb6332b96",
+      "name": "AI Agent (Digest Tips)1",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -1136,
+        3200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const base = $('Build Digest Base1').first().json;\nconst aiOutput = ($json.output || $json.text || '').trim();\n\nconst message = `\\ud83c\\udf05 Assalomu alaykum, Asadulla!\\nBugun: ${base.dateStr}\\n\\ud83d\\udd57 Hozir: ${base.timeStr}\\n\\ud83d\\udccd Toshkent\\n\\ud83c\\udf24 Havo: +${base.temp}\\u00b0C\\n\\ud83c\\udf05 Quyosh chiqishi: ${base.sunrise}\\n\\ud83c\\udf07 Quyosh botishi: ${base.sunset}\\n\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\n\\ud83d\\udcc5 BUGUNGI REJALAR\\n${base.calendarBlock}\\n\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\n\\ud83d\\udce7 EMAIL\\n\\ud83d\\udce5 Yangi: ${base.gmailCount} ta${base.gmailImportant ? `\\n\\u2b50 ${base.gmailImportant}` : ''}\\n\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\n\\ud83d\\udcbb LOYIHALAR\\n${base.projectsBlock}\\n\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\n${aiOutput}`;\n\nlet finalMessage = message;\nif (finalMessage.length > 3900) {\n  finalMessage = finalMessage.slice(0, 3900) + '\\n\\n\\u2026xabar juda uzun edi, qisqartirildi.';\n}\n\nreturn [{ json: { chatId: '1211791131', reply: finalMessage } }];"
+      },
+      "id": "31138704-7c9d-47b9-be3c-bd34f8762f00",
+      "name": "Build Final Digest Message1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -896,
+        3200
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.reply }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "ae17eea6-bcbe-4ed7-8282-1832c0092a35",
+      "name": "Send Digest1",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -656,
+        3200
+      ],
+      "webhookId": "4e1cc2d8-87a3-47cc-bf30-cfeef1fa32d1",
+      "credentials": {
+        "telegramApi": {
+          "id": "R6Lcd8ikBQclkdWk",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "🕒 Kun davomida 2 marta (tushlik va kechqurun) hol-ahvol so'rab, motivatsiya beruvchi qisqa xabar. Ertalabki katta hisobot yuqoridagi flow orqali keladi — shu bilan birga kuniga jami 3 marta bo'ladi.",
+        "width": 380
+      },
+      "id": "d83df195-00e9-4f90-af5d-bb6c96d34972",
+      "name": "Checkin Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2576,
+        3632
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 13 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 19 * * *"
+            }
+          ]
+        }
+      },
+      "id": "8d96f815-8c0c-4e5b-8546-6cb735053b07",
+      "name": "Checkin 13:00 & 19:",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -2576,
+        3824
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "9cba53fd-d246-4b74-b1e1-b72ea7b44ca3",
+      "name": "Gemini Model (Checkin)1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -2304,
+        4048
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "aGmKa1MN8UaVewNY",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ 'Hozirgi vaqt: ' + $now.toFormat('HH:mm') + '. Asadullaga qisqa hol-ahvol va motivatsiya xabari yoz.' }}",
+        "options": {
+          "systemMessage": "Siz Asadulla uchun shaxsiy yordamchisiz. Kuniga bir necha marta unga qisqa xabar yuborasiz: hol-ahvol so'rang, ishi/o'qishi qanday ketayotganini so'rang va bitta qiziqarli maslahat yoki motivatsion gap qo'shing (mavzular: mahsuldorlik, ingliz tili o'qitish, dasturlash, intizom, vaqtni boshqarish). Xabar 3-4 qatordan oshmasin, samimiy va qisqa bo'lsin, 1-2 tadan ortiq emoji ishlatmang. O'zbek tilida yozing."
+        }
+      },
+      "id": "2005f2a8-a7e4-444a-9f65-f4b85383f731",
+      "name": "AI Agent (Checkin)1",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -2304,
+        3824
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = ($json.output || $json.text || '').trim();\nreturn [{ json: { chatId: '1211791131', reply: output } }];"
+      },
+      "id": "20f7da2a-c20d-4311-b406-adcfbc4d26c6",
+      "name": "Prepare Checkin Reply1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2064,
+        3824
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.reply }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "4d67a650-920e-43f5-a2c8-eb414328f82f",
+      "name": "Send Checkin1",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -1824,
+        3824
+      ],
+      "webhookId": "4690ba82-9ebb-414f-b39b-2752cbd3d808",
+      "credentials": {
+        "telegramApi": {
+          "id": "R6Lcd8ikBQclkdWk",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "📌 SOZLASH KERAK BO'LGAN JOYLAR:\n\n1) \"Send Digest\" va \"Send Checkin\" nodelarida chatId = SIZNING shaxsiy Telegram ID'ingiz (guruh emas, sizning o'zingiz bilan botning suhbati). ID'ni bilish uchun @userinfobot ga /start yozing.\n\n2) \"Get Unread Gmail\" va \"Get Projects Sheet\" nodelariga o'z Gmail / Google Sheets credential'ingizni ulang.\n\n3) \"Get Projects Sheet\" - Sheet ID va gid=0 allaqachon qo'yilgan (sizning jadvalingiz). Faqat Google Sheets credential'ni ulash qoladi.\n\n4) Telegram va Google Calendar credential'lari asosiy botdagi bilan bir xil qilib ulanadi.\n\n5) Har ikkala Schedule Trigger'ni tekshirib, kerak bo'lsa vaqtni o'zgartiring (hozir: 08:00 digest, 13:00 va 19:00 checkin).",
+        "height": 320,
+        "width": 460
+      },
+      "id": "8c01df98-380b-45fc-9042-1159c8443117",
+      "name": "Setup Instructions1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2576,
+        2800
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Prepare Reply2": {
+      "main": [
+        [
+          {
+            "node": "Send Reply2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Event in Google Calendar2": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory2": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent2": {
+      "main": [
+        [
+          {
+            "node": "Prepare Reply2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Telegram Message2": {
+      "main": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger2": {
+      "main": [
+        [
+          {
+            "node": "Prepare Telegram Message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Events": {
+      "main": [
+        [
+          {
+            "node": "Get Unread Gmail1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Emails": {
+      "main": [
+        [
+          {
+            "node": "Get Projects Sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Morning 08:": {
+      "main": [
+        [
+          {
+            "node": "Get Weather1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Weather1": {
+      "main": [
+        [
+          {
+            "node": "Get Today Events1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Today Events1": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Unread Gmail1": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Projects Sheet1": {
+      "main": [
+        [
+          {
+            "node": "Build Digest Base1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Digest Base1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent (Digest Tips)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Model (Digest)1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent (Digest Tips)1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent (Digest Tips)1": {
+      "main": [
+        [
+          {
+            "node": "Build Final Digest Message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Final Digest Message1": {
+      "main": [
+        [
+          {
+            "node": "Send Digest1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checkin 13:00 & 19:": {
+      "main": [
+        [
+          {
+            "node": "AI Agent (Checkin)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Model (Checkin)1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent (Checkin)1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent (Checkin)1": {
+      "main": [
+        [
+          {
+            "node": "Prepare Checkin Reply1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Checkin Reply1": {
+      "main": [
+        [
+          {
+            "node": "Send Checkin1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "dd44bf67-d85b-4722-b6e3-e88a07b226bf",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "52f68e58fb24d343d27cbcd30e7ff5754662d3a016922c7d623aa881b5172dde"
+  },
+  "nodeGroups": [],
+  "id": "LNWKTmtXCk907PYN",
+  "tags": []
+}
